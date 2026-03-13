@@ -1,16 +1,3 @@
----
-title: IntelliChat AI Assistant
-emoji: 🤖
-colorFrom: purple
-colorTo: blue
-sdk: gradio
-sdk_version: 4.44.0
-app_file: app.py
-pinned: false
-license: mit
-short_description: Free AI chatbot powered by Qwen2-7B on Hugging Face
----
-
 # IntelliChat AI Assistant
 
 IntelliChat AI Assistant is a production-ready chatbot built with Gradio and powered by free Hugging Face Inference API models. It delivers live streaming responses, a polished dark interface, and robust model failover to keep responses available when one model is temporarily unsupported.
@@ -54,18 +41,6 @@ Token chunks streamed to Gradio UI
 ├── .env.example
 └── Screenshot 2026-03-13 184532.png
 ```
-
-## Quick Deploy to Hugging Face Spaces
-
-1. Go to https://huggingface.co/spaces and click **Create new Space**.
-2. Set Space name to `intellichat-ai-assistant`.
-3. Choose **SDK: Gradio**.
-4. Upload: `app.py`, `requirements.txt`, `README.md`, `.env.example`, and screenshot file (optional).
-5. Open **Settings → Variables and Secrets**.
-6. Add secret:
-   - Name: `HF_TOKEN`
-   - Value: your token from https://huggingface.co/settings/tokens
-7. Wait for the build to finish and open your live Space URL.
 
 ## Local Development
 
