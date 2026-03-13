@@ -11,67 +11,68 @@ license: mit
 short_description: Free AI chatbot powered by Qwen2-7B on Hugging Face
 ---
 
-# 🤖 IntelliChat AI Assistant
+# IntelliChat AI Assistant
 
-IntelliChat AI Assistant is a production-ready, zero-cost chatbot that runs on Hugging Face Spaces using free Hugging Face Inference API models. It provides live token streaming, ChatGPT-like conversational UX, customizable model controls, and resilient fallback inference for reliable responses.
+IntelliChat AI Assistant is a production-ready chatbot built with Gradio and powered by free Hugging Face Inference API models. It delivers live streaming responses, a polished dark interface, and robust model failover to keep responses available when one model is temporarily unsupported.
 
-## ✨ Features
+## Live Demo UI
 
-- Real-time token streaming in the UI for fast perceived response time.
-- Primary model: `Qwen/Qwen2-7B-Instruct` (free and strong instruction-following).
-- Fallback model: `microsoft/Phi-2` if primary inference fails.
-- ChatGPT-style interface with IntelliChat branding.
-- Advanced controls for `system prompt`, `max tokens`, `temperature`, and `top_p`.
-- Safe error handling with user-friendly messages.
-- One-click deployment to Hugging Face Spaces.
+![IntelliChat Live Demo](Screenshot%202026-03-13%20184532.png)
 
-## 🏗️ Architecture
+## Features
+
+- Real-time token streaming in the chat window.
+- Premium dark UI inspired by modern AI chat products.
+- Primary model with automatic fallback model routing.
+- Advanced generation controls for prompt and sampling.
+- Error-safe backend with friendly fallback messages.
+- Zero-cost deployment on Hugging Face Spaces.
+
+## Architecture
 
 ```text
 User Message
    ↓
 Gradio ChatInterface
    ↓
-respond(message, history, ...)
+respond(message, history, system_prompt, max_tokens, temperature, top_p)
    ↓
-build_prompt() -> ChatML-style prompt
+Build messages list (system + history + user)
    ↓
-InferenceClient.text_generation(stream=True)
+InferenceClient.chat.completions.create(stream=True)
    ↓
-Token-by-token yield
-   ↓
-Live streamed response in UI
+Token chunks streamed to Gradio UI
 ```
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 .
 ├── app.py
 ├── requirements.txt
 ├── README.md
-└── .env.example
+├── .env.example
+└── Screenshot 2026-03-13 184532.png
 ```
 
-## 🚀 Quick Deploy to HF Spaces
+## Quick Deploy to Hugging Face Spaces
 
 1. Go to https://huggingface.co/spaces and click **Create new Space**.
-2. Use Space name: `intellichat-ai-assistant`.
-3. Select **SDK: Gradio**.
-4. Upload these files: `app.py`, `requirements.txt`, `README.md`, `.env.example`.
+2. Set Space name to `intellichat-ai-assistant`.
+3. Choose **SDK: Gradio**.
+4. Upload: `app.py`, `requirements.txt`, `README.md`, `.env.example`, and screenshot file (optional).
 5. Open **Settings → Variables and Secrets**.
 6. Add secret:
-   - **Name**: `HF_TOKEN`
-   - **Value**: your token from https://huggingface.co/settings/tokens
-7. Wait for build + launch, then share your live Space URL.
+   - Name: `HF_TOKEN`
+   - Value: your token from https://huggingface.co/settings/tokens
+7. Wait for the build to finish and open your live Space URL.
 
-## 🔧 Local Development
+## Local Development
 
 ### Prerequisites
 
 - Python 3.10+
-- A free Hugging Face account
-- Hugging Face token with inference access
+- Hugging Face account and API token
 
 ### Setup
 
@@ -81,15 +82,15 @@ cd intellichat-ai
 python -m venv .venv
 ```
 
-#### Activate virtual environment
+### Activate venv
 
-- **Windows PowerShell**
+Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-- **macOS/Linux**
+macOS/Linux:
 
 ```bash
 source .venv/bin/activate
@@ -103,13 +104,13 @@ pip install -r requirements.txt
 
 ### Set environment variables
 
-- **Windows PowerShell**
+Windows PowerShell:
 
 ```powershell
 $env:HF_TOKEN="your_huggingface_token"
 ```
 
-- **macOS/Linux**
+macOS/Linux:
 
 ```bash
 export HF_TOKEN="your_huggingface_token"
@@ -118,58 +119,57 @@ export HF_TOKEN="your_huggingface_token"
 Optional model override:
 
 ```bash
-export MODEL_ID="microsoft/Phi-2"
+export MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
 ```
 
-### Run the app
+### Run
 
 ```bash
 python app.py
 ```
 
-Then open the local URL shown in terminal (usually `http://127.0.0.1:7860`).
+Then open the local URL shown in terminal (commonly `http://127.0.0.1:7860`).
 
-## ⚙️ Configuration
+## Configuration
 
-| Variable      | Default | Description                                                                 |
-| ------------- | ------- | --------------------------------------------------------------------------- |
-| `HF_TOKEN`    | `""`    | Hugging Face token used by `InferenceClient` for API calls.                 |
-| `MODEL_ID`    | unset   | Optional override for primary model (defaults to `Qwen/Qwen2-7B-Instruct`). |
-| `max_tokens`  | `512`   | Maximum number of new tokens generated per reply.                           |
-| `temperature` | `0.7`   | Sampling creativity (higher is more diverse).                               |
-| `top_p`       | `0.9`   | Nucleus sampling threshold.                                                 |
+| Variable      | Default | Description                                     |
+| ------------- | ------- | ----------------------------------------------- |
+| `HF_TOKEN`    | `""`    | Hugging Face token used for inference requests. |
+| `MODEL_ID`    | unset   | Optional manual model override.                 |
+| `max_tokens`  | `512`   | Max output tokens per response.                 |
+| `temperature` | `0.7`   | Response creativity control.                    |
+| `top_p`       | `0.9`   | Nucleus sampling threshold.                     |
 
-## 🛠️ Tech Stack
+## Model Strategy
 
-| Component      | Technology                        |
-| -------------- | --------------------------------- |
-| Frontend/UI    | Gradio                            |
-| Primary Model  | `Qwen/Qwen2-7B-Instruct`          |
-| Fallback Model | `microsoft/Phi-2`                 |
-| Inference      | `huggingface_hub.InferenceClient` |
-| Deployment     | Hugging Face Spaces (Gradio SDK)  |
-| Language       | Python 3.10+                      |
+- Primary target: `Qwen/Qwen2-7B-Instruct`
+- Compatibility fallbacks: `Qwen/Qwen2.5-7B-Instruct`, `meta-llama/Llama-3.1-8B-Instruct`
+- Legacy fallback: `microsoft/Phi-2`
 
-## ✅ Production Notes
+The app automatically tries models in order and streams from the first working provider/model pair.
 
-- Keep `HF_TOKEN` in Hugging Face Space Secrets (never commit real tokens).
-- Use fallback model to improve availability during high load.
-- Keep prompts concise to reduce latency and token usage.
-- Adjust `max_tokens` to control cost/performance behavior.
+## Tech Stack
 
-## 🧪 Troubleshooting
+| Component        | Technology                        |
+| ---------------- | --------------------------------- |
+| UI               | Gradio                            |
+| Inference Client | `huggingface_hub.InferenceClient` |
+| Runtime          | Python 3.10+                      |
+| Deployment       | Hugging Face Spaces               |
 
-- **Authentication error**: verify `HF_TOKEN` is valid and set in env/secrets.
-- **Slow responses**: reduce `max_tokens` and temperature; fallback to `microsoft/Phi-2`.
-- **Build issues on Space**: confirm `sdk_version`, `app_file`, and dependency install logs.
-- **Empty output**: check model availability and inference API status.
+## Troubleshooting
 
-## 🔐 Security
+- **No response**: verify `HF_TOKEN` is valid and has inference access.
+- **Model not supported**: set `MODEL_ID` to a supported model for your account.
+- **Slow generation**: reduce `max_tokens`, set lower `temperature`.
+- **Space build failure**: check build logs for dependency/install errors.
 
-- Do not hardcode API tokens in source files.
-- Do not commit `.env` files containing secrets.
-- Rotate tokens if exposed.
+## Security Best Practices
 
-## 📝 License
+- Keep secrets only in Hugging Face Space Secrets or local environment.
+- Never commit real tokens into source control.
+- Rotate tokens if accidentally exposed.
+
+## License
 
 MIT
