@@ -2,6 +2,9 @@
 
 IntelliChat AI Assistant is a production-ready chatbot built with Gradio and powered by free Hugging Face Inference API models. It delivers live streaming responses, a polished dark interface, and robust model failover to keep responses available when one model is temporarily unsupported.
 
+Live Demo:
+https://huggingface.co/spaces/Krish1156/intellichat-ai-assistant
+
 ## Live Demo UI
 
 ![IntelliChat Live Demo](Screenshot%202026-03-13%20184532.png)
