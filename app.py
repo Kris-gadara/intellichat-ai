@@ -23,9 +23,13 @@ and concise. If you don't know something, you say so honestly."""
 
 PRIMARY_MODEL_ID = "Qwen/Qwen2-7B-Instruct"
 FALLBACK_MODEL_ID = "microsoft/Phi-2"
+COMPATIBLE_FALLBACK_MODELS = [
+    "Qwen/Qwen2.5-7B-Instruct",
+    "meta-llama/Llama-3.1-8B-Instruct",
+]
 
 HF_TOKEN = os.environ.get("HF_TOKEN", "")
-client = InferenceClient(model="Qwen/Qwen2-7B-Instruct", token=HF_TOKEN)
+client = InferenceClient(model=PRIMARY_MODEL_ID, token=HF_TOKEN)
 fallback_client = InferenceClient(model=FALLBACK_MODEL_ID, token=HF_TOKEN)
 
 # Optional override for the primary model, e.g., MODEL_ID=microsoft/Phi-2.
@@ -34,38 +38,79 @@ if MODEL_ID:
     client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
 
 
+def stream_chat_reply(
+    inference_client: InferenceClient,
+    messages: list[dict],
+    max_tokens: int,
+    temperature: float,
+    top_p: float,
+) -> Generator[str, None, None]:
+    """Stream incremental assistant text from HF conversational API."""
+    stream = inference_client.chat.completions.create(
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        stream=True,
+    )
+
+    response = ""
+    for chunk in stream:
+        piece = ""
+
+        if hasattr(chunk, "choices") and chunk.choices:
+            delta = getattr(chunk.choices[0], "delta", None)
+            content = getattr(delta, "content", None)
+            if isinstance(content, str):
+                piece = content
+            elif isinstance(content, list):
+                piece = "".join(
+                    str(item.get("text", ""))
+                    for item in content
+                    if isinstance(item, dict)
+                )
+        elif isinstance(chunk, str):
+            piece = chunk
+
+        if piece:
+            response += piece
+            yield response
+
+
 CUSTOM_CSS = """
 body, .gradio-container {
-    background: #343541 !important;
+    background: #0b0f14 !important;
+    color: #e5e7eb !important;
 }
 
 #app-shell {
-    max-width: 1100px;
-    margin: 20px auto;
-    border-radius: 16px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.30);
+    max-width: 1140px;
+    margin: 18px auto;
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
     overflow: hidden;
-    background: #444654;
-    border: 1px solid #565869;
+    background: #111827;
+    border: 1px solid #1f2937;
 }
 
 #header-banner {
-    background: #202123;
-    color: #ececf1;
-    padding: 18px 22px;
-    border-bottom: 1px solid #3f4048;
+    background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+    color: #f8fafc;
+    padding: 20px 24px;
+    border-bottom: 1px solid #1f2937;
 }
 
 #header-banner h1 {
     margin: 0;
-    font-size: 1.4rem;
-    font-weight: 650;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
 }
 
 #header-banner p {
     margin: 6px 0 0 0;
-    color: #acacbe;
-    font-size: 0.95rem;
+    color: #94a3b8;
+    font-size: 0.9rem;
 }
 
 #app-shell .prose,
@@ -73,32 +118,51 @@ body, .gradio-container {
 #app-shell label,
 #app-shell .gr-markdown,
 #app-shell .gradio-markdown {
-    color: #ececf1 !important;
+    color: #e2e8f0 !important;
 }
 
 #app-shell [data-testid="chatbot"] {
-    background: #444654 !important;
+    background: #111827 !important;
     border-radius: 0 0 16px 16px;
 }
 
 #app-shell [data-testid="chatbot"] .message,
 #app-shell .message,
 #app-shell .bubble {
-    border-radius: 12px !important;
-    border: 1px solid #565869;
+    border-radius: 14px !important;
+    border: 1px solid #243041;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
 }
 
 #app-shell textarea,
 #app-shell input,
 #app-shell .gr-textbox textarea {
-    background: #40414f !important;
-    color: #ececf1 !important;
-    border: 1px solid #565869 !important;
+    background: #0f172a !important;
+    color: #e5e7eb !important;
+    border: 1px solid #334155 !important;
+}
+
+#app-shell textarea:focus,
+#app-shell input:focus,
+#app-shell .gr-textbox textarea:focus {
+    border: 1px solid #6366f1 !important;
+    box-shadow: 0 0 0 1px #6366f1 !important;
+}
+
+#app-shell button {
+    border-radius: 10px !important;
+    border: 1px solid #334155 !important;
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+}
+
+#app-shell button:hover {
+    background: #273449 !important;
 }
 
 #footer-note {
     text-align: center;
-    color: #acacbe;
+    color: #94a3b8;
     padding: 12px 10px 18px 10px;
     font-size: 0.88rem;
 }
@@ -159,38 +223,36 @@ def respond(
             )
 
     messages.append({"role": "user", "content": message})
-    prompt = build_prompt(messages)
 
-    try:
-        stream = client.text_generation(
-            prompt,
-            max_new_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            stream=True,
-            stop_sequences=["<|im_end|>", "<|im_start|>"],
-        )
-        response = ""
-        for token in stream:
-            response += token
-            yield response
-    except Exception:
-        # Primary model failed; try the lightweight fallback for resilience.
+    candidate_model_ids = []
+    if MODEL_ID:
+        candidate_model_ids.append(MODEL_ID)
+    candidate_model_ids.extend(
+        [PRIMARY_MODEL_ID, *COMPATIBLE_FALLBACK_MODELS, FALLBACK_MODEL_ID]
+    )
+
+    # Remove duplicates while preserving order.
+    deduped_model_ids = list(dict.fromkeys(candidate_model_ids))
+
+    last_error = None
+    for model_id in deduped_model_ids:
         try:
-            stream = fallback_client.text_generation(
-                prompt,
-                max_new_tokens=max_tokens,
+            temp_client = InferenceClient(model=model_id, token=HF_TOKEN)
+            yield from stream_chat_reply(
+                inference_client=temp_client,
+                messages=messages,
+                max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
-                stream=True,
-                stop_sequences=["<|im_end|>", "<|im_start|>"],
             )
-            response = ""
-            for token in stream:
-                response += token
-                yield response
+            return
         except Exception as e:
-            yield f"⚠️ Sorry, I encountered an error: {str(e)}. Please try again."
+            last_error = e
+
+    error_text = str(last_error).strip() if last_error else "Unknown error"
+    if not error_text:
+        error_text = repr(last_error)
+    yield f"Sorry, I encountered an error: {error_text}. Please try again."
 
 
 with gr.Blocks(title="IntelliChat AI Assistant") as demo:
@@ -198,7 +260,7 @@ with gr.Blocks(title="IntelliChat AI Assistant") as demo:
         gr.HTML(
             """
             <div id="header-banner">
-                <h1>🤖 IntelliChat AI Assistant</h1>
+                <h1>IntelliChat AI Assistant</h1>
                 <p>Powered by Qwen2-7B • Free • Open Source</p>
             </div>
             """
@@ -247,7 +309,7 @@ with gr.Blocks(title="IntelliChat AI Assistant") as demo:
         )
 
         gr.Markdown(
-            "Built with ❤️ using Gradio + Hugging Face • IntelliChat v1.0",
+            "Built with Gradio and Hugging Face • IntelliChat v1.0",
             elem_id="footer-note",
         )
 
