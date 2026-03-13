@@ -35,45 +35,72 @@ if MODEL_ID:
 
 
 CUSTOM_CSS = """
+body, .gradio-container {
+    background: #343541 !important;
+}
+
 #app-shell {
     max-width: 1100px;
-    margin: 24px auto;
-    border-radius: 18px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.10);
+    margin: 20px auto;
+    border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.30);
     overflow: hidden;
-    background: #ffffff;
+    background: #444654;
+    border: 1px solid #565869;
 }
 
 #header-banner {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
-    padding: 24px 28px;
+    background: #202123;
+    color: #ececf1;
+    padding: 18px 22px;
+    border-bottom: 1px solid #3f4048;
 }
 
 #header-banner h1 {
     margin: 0;
-    font-size: 1.9rem;
-    font-weight: 700;
+    font-size: 1.4rem;
+    font-weight: 650;
 }
 
 #header-banner p {
-    margin: 8px 0 0 0;
-    font-size: 1rem;
-    opacity: 0.95;
+    margin: 6px 0 0 0;
+    color: #acacbe;
+    font-size: 0.95rem;
+}
+
+#app-shell .prose,
+#app-shell .md,
+#app-shell label,
+#app-shell .gr-markdown,
+#app-shell .gradio-markdown {
+    color: #ececf1 !important;
+}
+
+#app-shell [data-testid="chatbot"] {
+    background: #444654 !important;
+    border-radius: 0 0 16px 16px;
+}
+
+#app-shell [data-testid="chatbot"] .message,
+#app-shell .message,
+#app-shell .bubble {
+    border-radius: 12px !important;
+    border: 1px solid #565869;
+}
+
+#app-shell textarea,
+#app-shell input,
+#app-shell .gr-textbox textarea {
+    background: #40414f !important;
+    color: #ececf1 !important;
+    border: 1px solid #565869 !important;
 }
 
 #footer-note {
     text-align: center;
-    color: #4b5563;
-    padding: 14px 10px 22px 10px;
-    font-size: 0.92rem;
-}
-
-/* Rounded chat bubbles */
-#app-shell .message,
-#app-shell .bubble,
-#app-shell [data-testid="chatbot"] .message {
-    border-radius: 14px !important;
+    color: #acacbe;
+    padding: 12px 10px 18px 10px;
+    font-size: 0.88rem;
 }
 """
 
@@ -124,6 +151,12 @@ def respond(
     for item in history or []:
         if isinstance(item, dict) and "role" in item and "content" in item:
             messages.append(item)
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            user_text, assistant_text = item
+            messages.append({"role": "user", "content": str(user_text or "")})
+            messages.append(
+                {"role": "assistant", "content": str(assistant_text or "")}
+            )
 
     messages.append({"role": "user", "content": message})
     prompt = build_prompt(messages)
@@ -160,11 +193,7 @@ def respond(
             yield f"⚠️ Sorry, I encountered an error: {str(e)}. Please try again."
 
 
-with gr.Blocks(
-    theme=gr.themes.Soft(),
-    css=CUSTOM_CSS,
-    title="IntelliChat AI Assistant",
-) as demo:
+with gr.Blocks(title="IntelliChat AI Assistant") as demo:
     with gr.Column(elem_id="app-shell"):
         gr.HTML(
             """
@@ -174,8 +203,6 @@ with gr.Blocks(
             </div>
             """
         )
-
-        gr.Markdown("Powered by Qwen2-7B • Free • Open Source")
 
         system_prompt_box = gr.Textbox(
             label="System Prompt",
@@ -210,17 +237,13 @@ with gr.Blocks(
 
         gr.ChatInterface(
             fn=respond,
-            type="messages",
-            chatbot=gr.Chatbot(type="messages", height=500),
+            chatbot=gr.Chatbot(height=500),
             additional_inputs=[
                 system_prompt_box,
                 max_tokens_slider,
                 temp_slider,
                 top_p_slider,
             ],
-            additional_inputs_accordion_name="▼ Advanced Settings",
-            submit_btn="Send 🚀",
-            clear_btn="Clear Chat 🗑️",
         )
 
         gr.Markdown(
@@ -229,4 +252,4 @@ with gr.Blocks(
         )
 
 if __name__ == "__main__":
-    demo.launch(show_api=False)
+    demo.launch(theme=gr.themes.Soft(), css=CUSTOM_CSS)
